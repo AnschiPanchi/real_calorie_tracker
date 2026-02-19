@@ -1,5 +1,6 @@
 const dns = require('node:dns/promises');
-dns.setServers(['8.8.8.8', '8.8.4.4']);
+dns.setServers(['8.8.8.8', '8.8.4.4']); // Keep this for your Windows DNS issues
+
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
@@ -9,81 +10,80 @@ const logRoutes = require('./routes/logs.js');
 
 const app = express();
 
-// Middleware
+// --- 1. FIXED CORS CONFIGURATION ---
 const allowedOrigins = [
-  'http://localhost:5173', // Keep for local testing
-  'https://your-nutri-app.vercel.app' // ADD YOUR LIVE VERCEL URL HERE
+  'http://localhost:5173', 
+  'https://calorie-tracker-dv42.vercel.app'
 ];
 
 app.use(cors({
-<<<<<<< HEAD
   origin: function (origin, callback) {
-    // Allows requests with no origin (like mobile apps) or matching our list
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+    // Allow requests with no origin (like mobile apps/Postman) or if in whitelist
+    if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Blocked by CORS policy'));
     }
   },
+  methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
-=======
-    origin: ["https://calorie-tracker-dv42.vercel.app"], // <-- Put your live frontend link here
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true
->>>>>>> db4419630956d5db205be3f2c1eec595b348c046
 }));
+
 app.use(express.json());
 
-// ROUTE MOUNTING
-app.use('/api/logs', logRoutes); 
-
-// Database Connection
+// --- 2. DATABASE & ROUTES ---
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB Connected"))
   .catch(err => console.error("❌ DB Error:", err));
 
-// Models - Keep User here for now, but Log MUST be moved out
+app.use('/api/logs', logRoutes); 
+
+// --- 3. AUTH ROUTES ---
 const User = mongoose.model('User', new mongoose.Schema({
   name: String,
-  email: { type: String, unique: true },
-  password: { type: String }
+  email: { type: String, unique: true, required: true },
+  password: { type: String, required: true }
 }));
 
-// Auth Routes
 app.post('/api/auth/signup', async (req, res) => {
-  const newUser = new User(req.body);
-  await newUser.save();
-  res.json(newUser);
+  try {
+    const newUser = new User(req.body);
+    await newUser.save();
+    res.status(201).json(newUser);
+  } catch (error) {
+    res.status(400).json({ error: "Signup failed" });
+  }
 });
 
 app.post('/api/auth/login', async (req, res) => {
-  const user = await User.findOne({ email: req.body.email, password: req.body.password });
-  if (user) res.json(user);
-  else res.status(401).send("Invalid credentials");
+  try {
+    const user = await User.findOne({ email: req.body.email, password: req.body.password });
+    if (user) res.json(user);
+    else res.status(401).json({ error: "Invalid credentials" });
+  } catch (error) {
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
-// USDA Search Route
+// --- 4. USDA SEARCH ROUTE ---
 app.get('/api/search', async (req, res) => {
   const { foodName } = req.query;
   const apiKey = process.env.USDA_API_KEY;
+
+  if (!foodName) return res.status(400).json({ error: "Search query required" });
 
   try {
     const response = await axios.get(
       `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${apiKey}&query=${foodName}`
     );
 
-    // IMPORTANT: Access the .foods property from the response
-    const foods = response.data.foods;
-
-    if (!foods || foods.length === 0) {
-      return res.json([]); // Return empty list if no results
-    }
-
-    res.json(foods); // Send the array of foods to your React frontend
+    const foods = response.data.foods || [];
+    res.json(foods); 
   } catch (error) {
     console.error("❌ USDA API Error:", error.message);
     res.status(500).json({ error: "Failed to fetch from USDA" });
   }
 });
 
-app.listen(5000, () => console.log("🚀 Server running on port 5000"));
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
