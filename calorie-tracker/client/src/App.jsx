@@ -9,6 +9,7 @@ import Auth from './components/Auth';
 import InsightsPage from './components/InsightsPage';
 import BMICalculator from './components/BMICalculator';
 import NutriBot from './components/NutriBot';
+import BarcodeScanner from './components/BarcodeScanner';
 
 function App() {
   const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('userData')) || null);
@@ -16,6 +17,7 @@ function App() {
   const [log, setLog] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [showScanner, setShowScanner] = useState(false);
 
   // Custom goal state with localStorage persistence
   const [goal, setGoal] = useState(() => Number(localStorage.getItem('dailyGoal')) || 2000);
@@ -73,6 +75,13 @@ function App() {
       setResults(res.data);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
+  };
+
+  // Log a food found by barcode
+  const handleBarcodeLog = ({ description, calories }) => {
+    api.post('/api/logs', { userEmail: user.email, description, calories })
+      .then(res => setLog(prev => [res.data, ...prev]));
+    setShowScanner(false);
   };
 
   if (!user) return <Auth onLogin={handleLogin} />;
@@ -134,7 +143,12 @@ function App() {
           </aside>
 
           <main className="main-content">
-            <SearchBar onSearch={handleSearch} />
+            <div className="search-row">
+              <SearchBar onSearch={handleSearch} />
+              <button className="barcode-trigger-btn" onClick={() => setShowScanner(true)} title="Scan food barcode">
+                📷 Scan Barcode
+              </button>
+            </div>
             {loading ? <div className="loader-container"><div className="spinner"></div></div> : <FoodResult results={results} onAdd={(f, c) => {
               api.post('/api/logs', { userEmail: user.email, description: f.description, calories: c })
                 .then(res => setLog([res.data, ...log]));
@@ -211,6 +225,11 @@ function App() {
 
       {/* Persistent floating NutriBot chatbot */}
       <NutriBot />
+
+      {/* Barcode scanner modal */}
+      {showScanner && (
+        <BarcodeScanner onClose={() => setShowScanner(false)} onLog={handleBarcodeLog} />
+      )}
     </div>
   );
 }

@@ -2358,7 +2358,376 @@ body {
     bottom: 16px;
   }
 
+
   .bmi-diet-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* ===============================================
+   SEARCH ROW + BARCODE TRIGGER
+   =============================================== */
+.search-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  margin-bottom: 4px;
+}
+
+.search-row> :first-child {
+  flex: 1;
+}
+
+.barcode-trigger-btn {
+  padding: 12px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--border-light);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-main);
+  font-size: 0.875rem;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.barcode-trigger-btn:hover {
+  background: rgba(0, 232, 150, 0.08);
+  border-color: rgba(0, 232, 150, 0.35);
+  color: var(--primary);
+  box-shadow: 0 0 14px rgba(0, 232, 150, 0.15);
+}
+
+/* ===============================================
+   BARCODE SCANNER MODAL
+   =============================================== */
+.barcode-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 8, 20, 0.85);
+  backdrop-filter: blur(12px);
+  z-index: 9500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease;
+}
+
+.barcode-modal {
+  width: 100%;
+  max-width: 480px;
+  background: rgba(10, 18, 35, 0.97);
+  border: 1px solid var(--border-light);
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.7);
+  animation: slideUpPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes slideUpPop {
+  from {
+    transform: translateY(30px) scale(0.95);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.barcode-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 22px 14px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 232, 150, 0.04);
+}
+
+.barcode-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text-main);
+  margin: 0 0 2px;
+}
+
+.barcode-sub {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.barcode-close-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-sub);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.barcode-close-btn:hover {
+  background: rgba(255, 77, 109, 0.1);
+  color: var(--danger);
+}
+
+/* Video */
+.barcode-video-wrapper {
+  position: relative;
+  background: #000;
+  line-height: 0;
+}
+
+/* html5-qrcode injects its own video tag — we must force it to object-fit */
+.barcode-video-wrapper video {
+  width: 100% !important;
+  height: 260px !important;
+  object-fit: cover !important;
+  display: block;
+}
+
+/* Corner bracket frame */
+.barcode-frame {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.barcode-corner {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  border-color: var(--primary);
+  border-style: solid;
+}
+
+.barcode-corner.tl {
+  top: 8px;
+  left: 8px;
+  border-width: 3px 0 0 3px;
+  border-radius: 4px 0 0 0;
+}
+
+.barcode-corner.tr {
+  top: 8px;
+  right: 8px;
+  border-width: 3px 3px 0 0;
+  border-radius: 0 4px 0 0;
+}
+
+.barcode-corner.bl {
+  bottom: 8px;
+  left: 8px;
+  border-width: 0 0 3px 3px;
+  border-radius: 0 0 0 4px;
+}
+
+.barcode-corner.br {
+  bottom: 8px;
+  right: 8px;
+  border-width: 0 3px 3px 0;
+  border-radius: 0 0 4px 0;
+}
+
+/* Scanning line animation */
+.barcode-frame::after {
+  content: '';
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--primary), transparent);
+  box-shadow: 0 0 8px var(--primary);
+  animation: scanLine 2s ease-in-out infinite;
+  top: 20px;
+}
+
+@keyframes scanLine {
+  0% {
+    top: 20px;
+    opacity: 1;
+  }
+
+  50% {
+    top: calc(100% - 20px);
+    opacity: 1;
+  }
+
+  51% {
+    opacity: 0;
+  }
+
+  100% {
+    top: 20px;
+    opacity: 0;
+  }
+}
+
+.barcode-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--text-sub);
+  font-size: 0.75rem;
+  padding: 5px 12px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.barcode-scanning-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 8, 20, 0.75);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--primary);
+  font-size: 0.875rem;
+}
+
+/* Result card */
+.barcode-result {
+  padding: 16px 20px 20px;
+}
+
+.barcode-result-inner {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.barcode-product-img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.barcode-product-name {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-main);
+  margin-bottom: 2px;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+}
+
+.barcode-product-brand {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.barcode-macros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bm-chip {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-light);
+  color: var(--text-sub);
+}
+
+.bm-chip.kcal {
+  background: rgba(0, 232, 150, 0.1);
+  border-color: rgba(0, 232, 150, 0.25);
+  color: var(--primary);
+}
+
+.barcode-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.barcode-rescan-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 11px;
+  border-radius: 12px;
+  border: 1px solid var(--border-light);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-sub);
+  font-size: 0.875rem;
+  font-family: 'Outfit', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.barcode-rescan-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.barcode-log-btn {
+  flex: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 11px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: #020d0a;
+  font-size: 0.875rem;
+  font-weight: 800;
+  font-family: 'Outfit', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.barcode-log-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0, 232, 150, 0.35);
+}
+
+.barcode-log-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.barcode-error-state {
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.barcode-error-state p {
+  color: var(--text-sub);
+  font-size: 0.875rem;
+  margin: 0;
 }
