@@ -134,50 +134,64 @@ app.post('/api/recognize-food', upload.single('image'), async (req, res) => {
 });
 
 // --- 6. AI NUTRITION CHATBOT ROUTE ---
+// Helper: sleep for ms milliseconds
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 app.post('/api/chat', async (req, res) => {
-  try {
-    const { message, history } = req.body;
-    if (!message) return res.status(400).json({ error: 'Message is required' });
+  const { message, history } = req.body;
+  if (!message) return res.status(400).json({ error: 'Message is required' });
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return res.status(500).json({ error: 'Gemini API key not configured' });
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Gemini API key not configured' });
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  const genAI = new GoogleGenerativeAI(apiKey);
+  // Use gemini-1.5-flash — separate quota pool from gemini-2.0-flash
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-    // Inject system persona as the very first exchange in history
-    const systemHistory = [
-      {
-        role: 'user',
-        parts: [{ text: 'You are NutriBot, a friendly AI nutrition assistant in the NutriTrack app. Help users with calorie counts, diet tips, food suggestions, macros and meal planning. Keep replies short (2-4 sentences or a brief list). Use emojis, be encouraging. Only answer food/nutrition topics.' }]
-      },
-      {
-        role: 'model',
-        parts: [{ text: "Got it! I'm NutriBot 🌿 — ready to help with all things nutrition. Ask me anything about food, calories, or your diet goals!" }]
-      }
-    ];
-
-    // Convert prior conversation history
-    const chatHistory = [
-      ...systemHistory,
-      ...(history || []).map(m => ({
-        role: m.role === 'bot' ? 'model' : 'user',
-        parts: [{ text: m.text }]
-      }))
-    ];
-
-    const chat = model.startChat({ history: chatHistory });
-    const result = await chat.sendMessage(message);
-    const reply = result.response.text();
-
-    res.json({ reply });
-  } catch (error) {
-    console.error('❌ Chat Error:', error.message);
-    // Friendly rate limit message
-    if (error.message?.includes('429') || error.message?.includes('quota') || error.message?.includes('retry')) {
-      return res.status(429).json({ error: 'RATE_LIMIT' });
+  const systemHistory = [
+    {
+      role: 'user',
+      parts: [{ text: 'You are NutriBot, a friendly AI nutrition assistant in the NutriTrack app. Help users with calorie counts, diet tips, food suggestions, macros and meal planning. Keep replies short (2-4 sentences or a brief list). Use emojis, be encouraging. Only answer food/nutrition topics.' }]
+    },
+    {
+      role: 'model',
+      parts: [{ text: "Got it! I'm NutriBot 🌿 — ready to help with all things nutrition. Ask me anything about food, calories, or your diet goals!" }]
     }
-    res.status(500).json({ error: 'Failed to get response', details: error.message });
+  ];
+
+  const chatHistory = [
+    ...systemHistory,
+    ...(history || []).map(m => ({
+      role: m.role === 'bot' ? 'model' : 'user',
+      parts: [{ text: m.text }]
+    }))
+  ];
+
+  // Auto-retry up to 2 times on 429 rate-limit errors
+  const MAX_RETRIES = 2;
+  const RETRY_DELAY_MS = 4000; // 4 seconds between retries
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const chat = model.startChat({ history: chatHistory });
+      const result = await chat.sendMessage(message);
+      const reply = result.response.text();
+      return res.json({ reply });
+    } catch (error) {
+      const isRateLimit = error.message?.includes('429') || error.message?.includes('quota') || error.message?.includes('retry');
+      console.error(`❌ Chat attempt ${attempt + 1} failed:`, error.message?.slice(0, 100));
+
+      if (isRateLimit && attempt < MAX_RETRIES) {
+        console.log(`⏳ Rate limited — retrying in ${RETRY_DELAY_MS / 1000}s...`);
+        await sleep(RETRY_DELAY_MS);
+        continue;
+      }
+
+      if (isRateLimit) {
+        return res.status(429).json({ error: 'RATE_LIMIT' });
+      }
+      return res.status(500).json({ error: 'Failed to get response', details: error.message });
+    }
   }
 });
 
