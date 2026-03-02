@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import api from '../api';
 
-const Auth = ({ onLogin }) => {
+const Auth = ({ onLogin, onBack }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
@@ -27,7 +28,16 @@ const Auth = ({ onLogin }) => {
 
   return (
     <div className="auth-overlay">
-      <div className="auth-card">
+      <div className="auth-card" style={{ position: 'relative' }}>
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            style={{ position: 'absolute', top: 24, left: 24, background: 'none', border: 'none', color: 'var(--text-sub)', cursor: 'pointer', padding: 4 }}
+          >
+            <ArrowLeft size={20} />
+          </button>
+        )}
         <div className="auth-header">
           <h2>{isLogin ? 'Welcome Back' : 'Create Account'}</h2>
           <p>{isLogin ? 'Login to track your calories' : 'Start your fitness journey today'}</p>

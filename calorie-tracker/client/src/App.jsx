@@ -10,17 +10,26 @@ import InsightsPage from './components/InsightsPage';
 import BMICalculator from './components/BMICalculator';
 import NutriBot from './components/NutriBot';
 import BarcodeScanner from './components/BarcodeScanner';
+import UserProfile from './components/UserProfile';
+import LandingPage from './components/LandingPage';
 
 function App() {
   const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('userData')) || null);
+  const [showAuthForm, setShowAuthForm] = useState(false);
   const [results, setResults] = useState([]);
   const [log, setLog] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showScanner, setShowScanner] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
 
-  // Custom goal state with localStorage persistence
-  const [goal, setGoal] = useState(() => Number(localStorage.getItem('dailyGoal')) || 2000);
+  // Custom goal state with localStorage persistence, falling back to user's saved goal
+  const [goal, setGoal] = useState(() => {
+    const localGoal = localStorage.getItem('dailyGoal');
+    if (localGoal) return Number(localGoal);
+    const userData = JSON.parse(localStorage.getItem('userData'));
+    return userData?.goal || 2000;
+  });
 
   // NEW: State for consumption highlights
   const [stats, setStats] = useState({
@@ -84,7 +93,10 @@ function App() {
     setShowScanner(false);
   };
 
-  if (!user) return <Auth onLogin={handleLogin} />;
+  if (!user) {
+    if (showAuthForm) return <Auth onLogin={handleLogin} onBack={() => setShowAuthForm(false)} />;
+    return <LandingPage onGetStarted={() => setShowAuthForm(true)} />;
+  }
 
   return (
     <div className="dashboard-root">
@@ -100,6 +112,7 @@ function App() {
         </div>
         <div className="user-section">
           <span className="user-name">Hello, {user.name}</span>
+          <button className="profile-btn" onClick={() => setShowProfile(true)}>Profile</button>
           <button className="logout-btn" onClick={() => { localStorage.removeItem('userData'); setUser(null); }}>Logout</button>
         </div>
       </header>
@@ -166,7 +179,7 @@ function App() {
       )}
 
       {activeTab === 'health' && (
-        <BMICalculator onSuggestSearch={(food) => {
+        <BMICalculator user={user} onSuggestSearch={(food) => {
           setActiveTab('dashboard');
           handleSearch(food);
         }} />
@@ -229,6 +242,22 @@ function App() {
       {/* Barcode scanner modal */}
       {showScanner && (
         <BarcodeScanner onClose={() => setShowScanner(false)} onLog={handleBarcodeLog} />
+      )}
+
+      {/* User Profile modal */}
+      {showProfile && (
+        <UserProfile
+          user={user}
+          onClose={() => setShowProfile(false)}
+          onUpdate={(updatedUser) => {
+            setUser(updatedUser);
+            localStorage.setItem('userData', JSON.stringify(updatedUser));
+            if (updatedUser.goal) {
+              setGoal(updatedUser.goal);
+              localStorage.setItem('dailyGoal', updatedUser.goal);
+            }
+          }}
+        />
       )}
     </div>
   );

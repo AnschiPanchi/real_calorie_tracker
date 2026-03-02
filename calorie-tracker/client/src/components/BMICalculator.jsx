@@ -52,10 +52,19 @@ const ACTIVITY_LABELS = {
 
 const STEPS = ['Personal', 'Body', 'Activity', 'Diet & Goal'];
 
-const BMICalculator = ({ onSuggestSearch }) => {
+const BMICalculator = ({ user, onSuggestSearch }) => {
     const [profile, setProfile] = useState(() => { try { return JSON.parse(localStorage.getItem('healthProfile')) || null; } catch { return null; } });
     const [step, setStep] = useState(0);
-    const [form, setForm] = useState({ name: '', age: '', gender: 'male', heightCm: '', weightKg: '', activity: 'moderate', goal: 'maintain', diet: 'veg' });
+    const [form, setForm] = useState({
+        name: user?.name || '',
+        age: user?.age || '',
+        gender: user?.gender && user.gender !== 'unspecified' ? user.gender : 'male',
+        heightCm: user?.height || '',
+        weightKg: user?.weight || '',
+        activity: user?.activityLevel || 'moderate',
+        goal: 'maintain',
+        diet: 'veg'
+    });
     const [result, setResult] = useState(null);
 
     useEffect(() => { if (profile) computeResult(profile); }, [profile]);
@@ -73,7 +82,22 @@ const BMICalculator = ({ onSuggestSearch }) => {
         setResult({ bmi, bmr, tdee, calTarget, category: getBMICategory(bmi) });
     };
 
-    const handleReset = () => { localStorage.removeItem('healthProfile'); setProfile(null); setResult(null); setStep(0); setForm({ name: '', age: '', gender: 'male', heightCm: '', weightKg: '', activity: 'moderate', goal: 'maintain', diet: 'veg' }); };
+    const handleReset = () => {
+        localStorage.removeItem('healthProfile');
+        setProfile(null);
+        setResult(null);
+        setStep(0);
+        setForm({
+            name: user?.name || '',
+            age: user?.age || '',
+            gender: user?.gender && user.gender !== 'unspecified' ? user.gender : 'male',
+            heightCm: user?.height || '',
+            weightKg: user?.weight || '',
+            activity: user?.activityLevel || 'moderate',
+            goal: 'maintain',
+            diet: 'veg'
+        });
+    };
 
     // ── Results ─────────────────────────────────────────────────
     if (result && profile) {

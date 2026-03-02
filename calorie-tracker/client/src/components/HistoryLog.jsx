@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, Clock, Calendar } from 'lucide-react';
+import { Trash2, Clock, Calendar, Download } from 'lucide-react';
 
 const HistoryLog = ({ log, onDelete }) => {
   const [now, setNow] = useState(new Date());
@@ -25,6 +25,30 @@ const HistoryLog = ({ log, onDelete }) => {
   const mm = String(Math.floor((secsLeft % 3600) / 60)).padStart(2, '0');
   const ss = String(secsLeft % 60).padStart(2, '0');
 
+  // --- Export CSV Logic ---
+  const exportCSV = () => {
+    if (!log || log.length === 0) return;
+
+    const headers = ['Food Item', 'Calories', 'Logged At'];
+    const rows = log.map(item => [
+      `"${item.description.replace(/"/g, '""')}"`, // escape quotes for CSV
+      item.calories,
+      `"${new Date(item.date || new Date()).toLocaleString()}"`
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `NutriTrack_Log_${dateStr.replace(/ /g, '_')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="history-container">
       {/* Date & Reset Timer Header */}
@@ -40,8 +64,16 @@ const HistoryLog = ({ log, onDelete }) => {
       </div>
 
       <div className="history-header">
-        <Clock size={20} color="#10b981" />
-        <h3>Today's Log</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Clock size={20} color="#10b981" />
+          <h3>Today's Log</h3>
+        </div>
+
+        {log.length > 0 && (
+          <button className="export-csv-btn" onClick={exportCSV} title="Export as CSV">
+            <Download size={14} /> Export
+          </button>
+        )}
       </div>
 
       {log.length === 0 ? (
