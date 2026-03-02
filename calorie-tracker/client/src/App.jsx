@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import api from './api';
 import './App.css';
 import SearchBar from './components/SearchBar';
 import FoodResult from './components/FoodResult';
 import HistoryLog from './components/HistoryLog';
 import Auth from './components/Auth';
+import InsightsPage from './components/InsightsPage';
+import BMICalculator from './components/BMICalculator';
+import NutriBot from './components/NutriBot';
 
 function App() {
   const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('userData')) || null);
@@ -12,7 +16,7 @@ function App() {
   const [log, setLog] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
-  
+
   // Custom goal state with localStorage persistence
   const [goal, setGoal] = useState(() => Number(localStorage.getItem('dailyGoal')) || 2000);
 
@@ -21,13 +25,16 @@ function App() {
     weekTotal: 0,
     monthTotal: 0,
     yearTotal: 0,
-    peakIntake: { calories: 0, date: 'No data' }
+    peakIntake: { calories: 0, date: 'No data' },
+    dailyData: [],
+    weeklyData: [],
+    monthlyData: [],
   });
 
   // Fetch daily logs
   useEffect(() => {
     if (user?.email) {
-      axios.get(`http://localhost:5000/api/logs?email=${user.email}`)
+      api.get(`/api/logs?email=${user.email}`)
         .then(res => setLog(res.data))
         .catch(err => console.error(err));
     }
@@ -36,7 +43,7 @@ function App() {
   // NEW: Fetch consumption highlights (stats)
   useEffect(() => {
     if (user?.email) {
-      axios.get(`http://localhost:5000/api/logs/stats?email=${user.email}`)
+      api.get(`/api/logs/stats?email=${user.email}`)
         .then(res => setStats(res.data))
         .catch(err => console.error("Stats fetch error:", err));
     }
@@ -49,7 +56,7 @@ function App() {
 
   const total = log.reduce((s, i) => s + (Number(i.calories) || 0), 0);
   const percentage = Math.min((total / goal) * 100, 100);
-  const radius = 85; 
+  const radius = 85;
   const strokeDasharray = 2 * Math.PI * radius;
   const strokeDashoffset = strokeDasharray - (strokeDasharray * percentage) / 100;
 
@@ -62,7 +69,7 @@ function App() {
     if (!query) return;
     setLoading(true);
     try {
-      const res = await axios.get(`http://localhost:5000/api/search?foodName=${query}`);
+      const res = await api.get(`/api/search?foodName=${query}`);
       setResults(res.data);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -78,6 +85,7 @@ function App() {
           <nav className="nav-links">
             <button className={`nav-link-btn ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>Dashboard</button>
             <button className={`nav-link-btn ${activeTab === 'stats' ? 'active' : ''}`} onClick={() => setActiveTab('stats')}>Insights</button>
+            <button className={`nav-link-btn ${activeTab === 'health' ? 'active' : ''}`} onClick={() => setActiveTab('health')}>Health</button>
             <button className={`nav-link-btn ${activeTab === 'about' ? 'active' : ''}`} onClick={() => setActiveTab('about')}>About</button>
           </nav>
         </div>
@@ -93,13 +101,13 @@ function App() {
             <div className="summary-card">
               <div className="meter-container">
                 <svg width="200" height="200">
-                  <circle stroke="#f1f5f9" strokeWidth="14" fill="transparent" r={radius} cx="100" cy="100"/>
-                  <circle 
-                    stroke={total > goal ? '#ef4444' : '#10b981'} 
-                    strokeWidth="14" 
-                    strokeDasharray={strokeDasharray} 
-                    style={{ strokeDashoffset, transition: '0.6s ease', transform: 'rotate(-90deg)', transformOrigin: 'center' }} 
-                    fill="transparent" r={radius} cx="100" cy="100" 
+                  <circle stroke="#f1f5f9" strokeWidth="14" fill="transparent" r={radius} cx="100" cy="100" />
+                  <circle
+                    stroke={total > goal ? '#ef4444' : '#10b981'}
+                    strokeWidth="14"
+                    strokeDasharray={strokeDasharray}
+                    style={{ strokeDashoffset, transition: '0.6s ease', transform: 'rotate(-90deg)', transformOrigin: 'center' }}
+                    fill="transparent" r={radius} cx="100" cy="100"
                   />
                 </svg>
                 <div className="total-display">
@@ -111,9 +119,9 @@ function App() {
               <div className="goal-setting-area">
                 <label>Set Daily Goal</label>
                 <div className="goal-input-wrapper">
-                  <input 
-                    type="number" 
-                    value={goal} 
+                  <input
+                    type="number"
+                    value={goal}
                     onChange={(e) => setGoal(Number(e.target.value))}
                     placeholder="2000"
                   />
@@ -128,39 +136,26 @@ function App() {
           <main className="main-content">
             <SearchBar onSearch={handleSearch} />
             {loading ? <div className="loader-container"><div className="spinner"></div></div> : <FoodResult results={results} onAdd={(f, c) => {
-              axios.post('http://localhost:5000/api/logs', { userEmail: user.email, description: f.description, calories: c })
+              api.post('/api/logs', { userEmail: user.email, description: f.description, calories: c })
                 .then(res => setLog([res.data, ...log]));
             }} />}
           </main>
 
           <aside className="sidebar-sticky right-sidebar">
-            <HistoryLog log={log} onDelete={(id) => axios.delete(`http://localhost:5000/api/logs/${id}`).then(() => setLog(log.filter(l => l._id !== id)))} />
+            <HistoryLog log={log} onDelete={(id) => api.delete(`/api/logs/${id}`).then(() => setLog(log.filter(l => l._id !== id)))} />
           </aside>
         </div>
       )}
 
       {activeTab === 'stats' && (
-        <div className="stats-page-container">
-          <div className="stats-grid">
-            <div className="stat-card highlight">
-              <h3>Peak Intake</h3>
-              <div className="stat-value">{stats.peakIntake.calories}<span> kcal</span></div>
-              <p>Achieved on {stats.peakIntake.date}</p>
-            </div>
-            <div className="stat-card">
-              <h3>This Week</h3>
-              <div className="stat-value">{stats.weekTotal}<span> kcal</span></div>
-            </div>
-            <div className="stat-card">
-              <h3>This Month</h3>
-              <div className="stat-value">{stats.monthTotal}<span> kcal</span></div>
-            </div>
-            <div className="stat-card">
-              <h3>This Year</h3>
-              <div className="stat-value">{stats.yearTotal}<span> kcal</span></div>
-            </div>
-          </div>
-        </div>
+        <InsightsPage stats={stats} />
+      )}
+
+      {activeTab === 'health' && (
+        <BMICalculator onSuggestSearch={(food) => {
+          setActiveTab('dashboard');
+          handleSearch(food);
+        }} />
       )}
 
       {activeTab === 'about' && (
@@ -213,6 +208,9 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Persistent floating NutriBot chatbot */}
+      <NutriBot />
     </div>
   );
 }

@@ -6,27 +6,35 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const axios = require('axios');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const multer = require('multer');
 const logRoutes = require('./routes/logs.js');
 
 const app = express();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 } // 20 MB max client upload size
+});
 
-// --- 1. FIXED CORS CONFIGURATION ---
+// --- 1. CORS CONFIGURATION (supports local dev + production via env) ---
 const allowedOrigins = [
-  'http://localhost:5173', 
-  'https://calorie-tracker-dv42.vercel.app'
+  'http://localhost:5173',
+  'http://localhost:5174',
+  // Production frontend URL — set CLIENT_URL in your hosting provider's env vars
+  ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []),
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps/Postman) or if in whitelist
+    // Allow requests with no origin (Postman, mobile) or if in whitelist
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Blocked by CORS policy'));
+      callback(new Error('Blocked by CORS: ' + origin));
     }
   },
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  credentials: true
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true,
 }));
 
 app.use(express.json());
@@ -36,7 +44,7 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB Connected"))
   .catch(err => console.error("❌ DB Error:", err));
 
-app.use('/api/logs', logRoutes); 
+app.use('/api/logs', logRoutes);
 
 // --- 3. AUTH ROUTES ---
 const User = mongoose.model('User', new mongoose.Schema({
@@ -78,10 +86,98 @@ app.get('/api/search', async (req, res) => {
     );
 
     const foods = response.data.foods || [];
-    res.json(foods); 
+    res.json(foods);
   } catch (error) {
     console.error("❌ USDA API Error:", error.message);
     res.status(500).json({ error: "Failed to fetch from USDA" });
+  }
+});
+
+// --- 5. IMAGE RECOGNITION ROUTE (Using Gemini with Compression) ---
+app.post('/api/recognize-food', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No image provided" });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "Gemini API key is not configured" });
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+    const prompt = "Identify the single main food item in this picture. Reply with ONLY the name of the food and absolutely nothing else. Keep it very concise (1-3 words max). For example: 'Apple', 'Pizza', 'Grilled Chicken'. Do not include markdown or punctuation.";
+
+    const imageParts = [
+      {
+        inlineData: {
+          data: req.file.buffer.toString("base64"),
+          mimeType: req.file.mimetype
+        }
+      }
+    ];
+
+    const result = await model.generateContent([prompt, ...imageParts]);
+    const response = await result.response;
+    const text = response.text().trim().replace(/['"]/g, '').replace(/\.$/, '');
+
+    res.json({ foodName: text });
+  } catch (error) {
+    console.error("❌ Gemini API Error Details:", error);
+    res.status(500).json({
+      error: "Failed to recognize food from image",
+      details: error.message
+    });
+  }
+});
+
+// --- 6. AI NUTRITION CHATBOT ROUTE ---
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { message, history } = req.body;
+    if (!message) return res.status(400).json({ error: 'Message is required' });
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) return res.status(500).json({ error: 'Gemini API key not configured' });
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+
+    // Inject system persona as the very first exchange in history
+    const systemHistory = [
+      {
+        role: 'user',
+        parts: [{ text: 'You are NutriBot, a friendly AI nutrition assistant in the NutriTrack app. Help users with calorie counts, diet tips, food suggestions, macros and meal planning. Keep replies short (2-4 sentences or a brief list). Use emojis, be encouraging. Only answer food/nutrition topics.' }]
+      },
+      {
+        role: 'model',
+        parts: [{ text: "Got it! I'm NutriBot 🌿 — ready to help with all things nutrition. Ask me anything about food, calories, or your diet goals!" }]
+      }
+    ];
+
+    // Convert prior conversation history
+    const chatHistory = [
+      ...systemHistory,
+      ...(history || []).map(m => ({
+        role: m.role === 'bot' ? 'model' : 'user',
+        parts: [{ text: m.text }]
+      }))
+    ];
+
+    const chat = model.startChat({ history: chatHistory });
+    const result = await chat.sendMessage(message);
+    const reply = result.response.text();
+
+    res.json({ reply });
+  } catch (error) {
+    console.error('❌ Chat Error:', error.message);
+    // Friendly rate limit message
+    if (error.message?.includes('429') || error.message?.includes('quota') || error.message?.includes('retry')) {
+      return res.status(429).json({ error: 'RATE_LIMIT' });
+    }
+    res.status(500).json({ error: 'Failed to get response', details: error.message });
   }
 });
 

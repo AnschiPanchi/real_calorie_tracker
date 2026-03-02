@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../api';
 
 const Auth = ({ onLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
@@ -9,16 +9,16 @@ const Auth = ({ onLogin }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    
+
     // Using the 5000 port where your server is running
     const endpoint = isLogin ? '/api/auth/login' : '/api/auth/signup';
-    
+
     try {
-      const res = await axios.post(`http://localhost:5000${endpoint}`, {
+      const res = await api.post(endpoint, {
         ...formData,
         email: formData.email.toLowerCase() // Matching your server's case-insensitive logic
       });
-      
+
       onLogin(res.data);
     } catch (err) {
       setError(err.response?.data?.error || 'Authentication failed. Check your connection.');
@@ -39,32 +39,32 @@ const Auth = ({ onLogin }) => {
           {!isLogin && (
             <div className="input-group">
               <label>Full Name</label>
-              <input 
-                type="text" 
-                placeholder="Ansh Gupta" 
-                required 
-                onChange={(e) => setFormData({...formData, name: e.target.value})} 
+              <input
+                type="text"
+                placeholder="Ansh Gupta"
+                required
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               />
             </div>
           )}
 
           <div className="input-group">
             <label>Email Address</label>
-            <input 
-              type="email" 
-              placeholder="ansh@example.com" 
-              required 
-              onChange={(e) => setFormData({...formData, email: e.target.value})} 
+            <input
+              type="email"
+              placeholder="ansh@example.com"
+              required
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             />
           </div>
 
           <div className="input-group">
             <label>Password</label>
-            <input 
-              type="password" 
-              placeholder="••••••••" 
-              required 
-              onChange={(e) => setFormData({...formData, password: e.target.value})} 
+            <input
+              type="password"
+              placeholder="••••••••"
+              required
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
             />
           </div>
 
